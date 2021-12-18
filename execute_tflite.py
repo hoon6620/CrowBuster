@@ -79,10 +79,10 @@ class Execute:
             inputs().setfield(in_frame,dtype=np.float32)
             self.interpreter.invoke()
             output_data = self.interpreter.get_tensor(output_details[0]['index'])
-            #print(output_data)
+            print(output_data[0])
             
             if np.argmax(output_data) == 1:
-                if output_data[1]/np.sum(output_data) > 0.45:
+                if output_data[0][1]/np.sum(output_data) > 0.45:
                     class_id=1
                 else:
                     class_id=2
