@@ -13,9 +13,10 @@ import configparser
 class ExecuteFrame(tk.Frame):
     def __init__(self,start_f,master=None,**kwargs):
 
-        file = open('./logger.log','r',encoding='Shift_JIS')
-        self.log=file.read()
-        file.close()
+        #file = open('./logger.log','r')
+        #self.log=file.read()
+        #file.close()
+        self.log = ""
 
         tk.Frame.__init__(self,master,**kwargs,width=700,height=700)
         self.canvas = tk.Canvas(self,width=600,height=400)
