@@ -50,9 +50,24 @@ class Execute:
         cap_w = cap.get(3)
         cap_h = cap.get(4)
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        
+        fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        self.logPath = '../CBLogs/' + str(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")) + '/'
+        print(self.logPath)
+        os.makedirs(self.logPath)
+        out = cv2.VideoWriter(self.logPath + "log_video.avi",
+                              fourcc, 10.0, (640, 480))
+        prev_time = 0
+        FPS = 10
+        
         while cap.isOpened():
             ret, frame = cap.read()
             frame = cv2.flip(frame,1)
+            
+            current_time = time.time() - prev_time            
+            if(current_time < 1./FPS):
+                continue
+            
             if not ret:
                 break
             #print("a")
@@ -67,7 +82,7 @@ class Execute:
             #print(output_data)
             
             if np.argmax(output_data) == 1:
-                if data[1]/np.sum(output_data) > 0.45:
+                if output_data[1]/np.sum(output_data) > 0.45:
                     class_id=1
                 else:
                     class_id=2
@@ -112,13 +127,17 @@ class Execute:
                     
                     #print(time.time()-self.audio_time)
                     PlayWavFie(sound) 
+                    logstr = str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))+" "+sound.split("sound/")[1]
                     self.audio_time=time.time()
-                    self.logdata=str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))+" "+sound.split("sound\\")[1]+"\n"
+                    self.logdata = logstr + "\n"
                     self.exec_f.txtbox.configure(state ='normal')
                     self.exec_f.txtbox.insert(1.0,self.logdata)
                     self.exec_f.txtbox.configure(state ='disabled')
-                    print(str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))+" "+sound.split("sound\\")[1])#sound log
+                    print(logstr)#sound log
+                    cv2.imwrite(self.logPath+str(datetime.datetime.now().strftime('%Y%m%d_%H%M%S')) + '.jpg', frame)
                 #print(median_class_id)
+                    
+            out.write(frame)
             frame = cv2.resize(frame,(600,400))
             self.preview_frame = frame
         
@@ -133,7 +152,7 @@ class Execute:
                 break
         cap.release()
     def writefile(self):
-        file = open('./logger.log','w')
+        file = open(self.logPath+'logger.log','w')
         file.write(self.exec_f.log)
         file.close()
 execute = Execute()
