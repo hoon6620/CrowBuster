@@ -40,9 +40,7 @@ class Execute:
         inputs = self.interpreter.tensor(input_details[0]['index'])
         output1 = self.interpreter.tensor(output_details[0]['index'])
         
-
-        #print(input_details[0]['shape'])
-        #print(output1)
+        self.detect_class = np.array([0 for _ in range(10)])
         
         cap = cv2.VideoCapture(0)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -50,13 +48,26 @@ class Execute:
         cap_w = cap.get(3)
         cap_h = cap.get(4)
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        
+        fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        self.logPath = '../CBLogs/' + str(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")) + '/'
+        print(self.logPath)
+        os.makedirs(self.logPath)
+        out = cv2.VideoWriter(self.logPath + "log_video.avi",
+                              fourcc, 10.0, (640, 480))
+        prev_time = 0
+        FPS = 10
+        
         while cap.isOpened():
             ret, frame = cap.read()
             frame = cv2.flip(frame,1)
-            if not ret:
-                break
-            #print("a")
             
+            current_time = time.time() - prev_time
+            if(current_time < 1./FPS):
+                continue
+            
+            if not ret:
+                break            
 
             model_n,model_w,model_h,model_c = input_details[0]['shape']
             in_frame = cv2.resize(frame, (model_w, model_h))
@@ -64,61 +75,60 @@ class Execute:
             inputs().setfield(in_frame,dtype=np.float32)
             self.interpreter.invoke()
             output_data = self.interpreter.get_tensor(output_details[0]['index'])
-            #print(output_data)
             
             if np.argmax(output_data) == 1:
-                if data[1]/np.sum(output_data) > 0.45:
+                if output_data[0][1]/np.sum(output_data) > 0.5:
                     class_id=1
                 else:
                     class_id=2
             else:
                 class_id=np.argmax(output_data)
-            if self.detect_class.__len__() < 10:
-               
-                self.detect_class = np.array([class_id for _ in range(10)])
-            else:
-                self.detect_class = np.append(self.detect_class[1:],class_id)
-                #print(self.detect_class)
-                self.exec_f.model.select_sound
-            
-            if self.detect_class.__len__() == 10:
-                median_class_id = np.median(self.detect_class)
-                self.detect_name=self.thing[int(median_class_id)]
-                frame = cv2.putText(frame,self.detect_name,(0,int(cap_h//10)),cv2.FONT_HERSHEY_PLAIN,cap_h//130,(0,0,255),3)
-                if self.logflag and time.time()-self.audio_time>5:
-                    self.exec_f.txtbox.configure(state ='normal')
-                    if self.detect_name==self.thing[1]:
-                        self.logdata="Repulsion Failure\t"+self.logdata
-                        self.exec_f.txtbox.insert(1.0,"Repulsion Failure\t")
-                    else:
-                        self.logdata="Repulsion Success\t"+self.logdata
-                        self.exec_f.txtbox.insert(1.0,"Repulsion Success\t")
-                        #print("")#escape crow log
-                    self.logflag=False
-                    self.exec_f.log=self.logdata+self.exec_f.log
-                    self.exec_f.txtbox.configure(state ='disabled')
-                    threading.Thread(target=self.writefile).start()
-                    
-                if self.detect_name==self.thing[1] and time.time()-self.audio_time>10:
 
-                    self.logflag=True
-                    if not self.exec_f.model.select_sound:
-                        sound = np.random.choice(self.path)
-                        #print(sound)
-                    else:
-                        sound = self.path[(int(np.random.choice(self.exec_f.model.select_sound)))]
-                        #print(self.exec_f.model.select_sound)
-                        #print(sound)
+            self.detect_class = np.append(self.detect_class[1:],class_id)
+            self.exec_f.model.select_sound
+            arr = np.array([0 for _ in range(3)])
+            for i in self.detect_class:
+                arr[i]+= 1
+            detected_class = np.argmax(arr)
+            
+            self.detect_name = self.thing[int(detected_class)]
+            frame = cv2.putText(frame,self.detect_name,(0,int(cap_h//10)),
+                                cv2.FONT_HERSHEY_PLAIN,cap_h//130,(0,0,255),3)
+            
+            if self.logflag and time.time()-self.audio_time>5:
+                self.exec_f.txtbox.configure(state ='normal')
+                
+                if self.detect_name==self.thing[1]:
+                    self.logdata="Repulsion Failure\t"+self.logdata
+                    self.exec_f.txtbox.insert(1.0,"Repulsion Failure\t")
+                else:
+                    self.logdata="Repulsion Success\t"+self.logdata
+                    self.exec_f.txtbox.insert(1.0,"Repulsion Success\t")
                     
-                    #print(time.time()-self.audio_time)
-                    PlayWavFie(sound) 
-                    self.audio_time=time.time()
-                    self.logdata=str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))+" "+sound.split("sound\\")[1]+"\n"
-                    self.exec_f.txtbox.configure(state ='normal')
-                    self.exec_f.txtbox.insert(1.0,self.logdata)
-                    self.exec_f.txtbox.configure(state ='disabled')
-                    print(str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))+" "+sound.split("sound\\")[1])#sound log
-                #print(median_class_id)
+                self.logflag=False
+                self.exec_f.log=self.logdata+self.exec_f.log
+                self.exec_f.txtbox.configure(state ='disabled')
+                threading.Thread(target=self.writefile).start()
+                
+            if (self.detect_name==self.thing[1]) and (time.time()-self.audio_time>10):
+                self.logflag=True
+                if not self.exec_f.model.select_sound:
+                    sound = np.random.choice(self.path)
+                else:
+                    sound = self.path[(int(np.random.choice(self.exec_f.model.select_sound)))]
+                    
+                PlayWavFie(sound) 
+                logstr = (str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))+" "+
+                          str(output_data[0][1]/np.sum(output_data))+" "+sound.split("sound/")[1])
+                self.audio_time=time.time()
+                self.logdata = logstr + "\n"
+                self.exec_f.txtbox.configure(state ='normal')
+                self.exec_f.txtbox.insert(1.0,self.logdata)
+                self.exec_f.txtbox.configure(state ='disabled')
+                cv2.imwrite(self.logPath+str(datetime.datetime.now().strftime('%Y%m%d_%H%M%S')) + '.jpg', frame)
+
+                
+            out.write(frame)
             frame = cv2.resize(frame,(600,400))
             self.preview_frame = frame
         
@@ -133,7 +143,8 @@ class Execute:
                 break
         cap.release()
     def writefile(self):
-        file = open('./logger.log','w')
+        file = open(self.logPath+'logger.log','w')
         file.write(self.exec_f.log)
+        self.exec_f.log = ""
         file.close()
 execute = Execute()
